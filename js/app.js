@@ -554,6 +554,100 @@
     });
   }
 
+  function buildCascade(record) {
+    const treeEl = $("#cascadeTree");
+    treeEl.innerHTML = "";
+    if (!window.WishExpansion) return;
+
+    const colors = ["#d8a955", "#c9924e", "#b56b3f", "#8a3940"];
+    const cascade = window.WishExpansion.cascadeFor(record) || [];
+
+    cascade.forEach(function (branch, i) {
+      const article = document.createElement("article");
+      article.className = "cascade__branch";
+      article.style.setProperty("--c", colors[i] || colors[colors.length - 1]);
+      article.style.animationDelay = (0.1 + i * 0.12) + "s";
+
+      const root = document.createElement("div");
+      root.className = "cascade__root";
+
+      const index = document.createElement("span");
+      index.className = "cascade__index";
+      index.textContent = String(i + 1).padStart(2, "0");
+
+      const body = document.createElement("div");
+      const tag = document.createElement("p");
+      tag.className = "cascade__tag";
+      tag.textContent = branch.tag;
+
+      const title = document.createElement("h3");
+      title.textContent = branch.title;
+
+      const text = document.createElement("p");
+      text.textContent = branch.text;
+
+      body.appendChild(tag);
+      body.appendChild(title);
+      body.appendChild(text);
+      root.appendChild(index);
+      root.appendChild(body);
+      article.appendChild(root);
+
+      const children = document.createElement("ul");
+      children.className = "cascade__children";
+      branch.children.forEach(function (line, j) {
+        const li = document.createElement("li");
+        const splinter = document.createElement("b");
+        splinter.textContent = "Splinter " + String(j + 1).padStart(2, "0");
+        li.appendChild(splinter);
+        li.appendChild(document.createTextNode(line));
+        children.appendChild(li);
+      });
+      article.appendChild(children);
+      treeEl.appendChild(article);
+    });
+  }
+
+  function buildTimeline(record, cascade) {
+    const list = $("#consequenceTimeline");
+    list.innerHTML = "";
+    if (!window.WishExpansion) return;
+
+    const timeline = window.WishExpansion.buildTimeline(record, cascade);
+    timeline.forEach(function (point) {
+      const li = document.createElement("li");
+      li.className = "timeline__item";
+      li.setAttribute("data-mood", point.mood);
+
+      const mark = document.createElement("div");
+      mark.className = "timeline__mark";
+      const num = document.createElement("span");
+      num.textContent = point.mark;
+      mark.appendChild(num);
+
+      const body = document.createElement("div");
+      body.className = "timeline__body";
+
+      const when = document.createElement("p");
+      when.className = "timeline__when";
+      when.textContent = point.when;
+
+      const title = document.createElement("h3");
+      title.textContent = point.title;
+
+      const text = document.createElement("p");
+      text.textContent = point.text;
+
+      body.appendChild(when);
+      body.appendChild(title);
+      body.appendChild(text);
+
+      li.appendChild(mark);
+      li.appendChild(body);
+      list.appendChild(li);
+    });
+  }
+
   function buildGentle(record) {
     answer.classList.add("is-gentle");
 
@@ -609,6 +703,9 @@
 
     const price = $("#priceSection");
     price.style.display = "none";
+    $("#cascadeSection").style.display = "none";
+    $("#timelineSection").style.display = "none";
+    $(".answer__rituals").style.display = "none";
     saveBtn.style.display = "none";
 
     const written = $("#answerWritten");
@@ -633,6 +730,9 @@
     $("#grantedSection").style.display = "";
     $("#spiralSection").style.display = "";
     $("#priceSection").style.display = "";
+    $("#cascadeSection").style.display = "";
+    $("#timelineSection").style.display = "";
+    $(".answer__rituals").style.display = "";
     saveBtn.style.display = "";
     $("#answerGranted").className = "granted__text";
     $("#answerTwin").className = "granted__twin";
@@ -643,7 +743,10 @@
     $("#answerWritten").style.display = "";
     $("#answerObservations").style.display = "";
     $(".spiral__list").style.display = "";
-    answer.querySelector(".disclaimer").innerHTML = "The willow is not real. The pattern is. <span>Written and performed in your browser · nothing leaves this device.</span>";
+    const spiralHead = $("#spiralSection .section-head");
+    spiralHead.querySelector("h2").textContent = "The Spiral";
+    spiralHead.querySelector("p").textContent = "Every wish has roots. These are the ones that will find you.";
+    answer.querySelector(".disclaimer").innerHTML = "The willow is not real. The pattern is. <span>Written and performed in your browser · nothing leaves this device except what you choose to nominate.</span>";
 
     typeWish(record.wish);
 
@@ -672,6 +775,8 @@
       $("#answerTwin").style.display = record.twin ? "" : "none";
 
       buildSpiral(record);
+      buildCascade(record);
+      buildTimeline(record);
 
       $("#answerPrice").textContent = record.price;
       $("#debtValue").textContent = record.severity.debt + "%";
@@ -705,13 +810,19 @@
     // reveal sections
     const granted = $("#grantedSection");
     const spiral = $("#spiralSection");
+    const cascade = $("#cascadeSection");
+    const timeline = $("#timelineSection");
     const price = $("#priceSection");
     granted.classList.remove("is-in");
     spiral.classList.remove("is-in");
+    cascade.classList.remove("is-in");
+    timeline.classList.remove("is-in");
     price.classList.remove("is-in");
     setTimeout(function () { granted.classList.add("is-in"); }, 120);
     setTimeout(function () { spiral.classList.add("is-in"); }, 360);
-    setTimeout(function () { price.classList.add("is-in"); }, 700);
+    setTimeout(function () { cascade.classList.add("is-in"); }, 820);
+    setTimeout(function () { timeline.classList.add("is-in"); }, 1120);
+    setTimeout(function () { price.classList.add("is-in"); }, 1420);
 
     setTimeout(function () {
       $("#answerClose").focus({ preventScroll: true });
@@ -757,9 +868,39 @@
     saveCurrent(true);
   });
 
+  function testimonyText(record) {
+    const base = window.WishEngine.toText(record);
+    if (!record || record.type !== "wish" || !window.WishExpansion) return base;
+
+    const lines = base.split("\n");
+    let closing = "";
+    if (lines.length && lines[lines.length - 1].indexOf("— the willow remembers") !== -1) {
+      closing = lines.pop();
+    }
+
+    const cascade = window.WishExpansion.cascadeFor(record);
+    const timeline = window.WishExpansion.buildTimeline(record, cascade);
+
+    lines.push("", "THE CASCADE");
+    cascade.forEach(function (branch, i) {
+      lines.push("", (i + 1) + ". " + branch.tag + " — " + branch.title, branch.text);
+      branch.children.forEach(function (child, j) {
+        lines.push("   " + (j + 1) + ") " + child);
+      });
+    });
+
+    lines.push("", "THE SLOW BURN");
+    timeline.forEach(function (point) {
+      lines.push("", point.when.toUpperCase() + " — " + point.title, point.text);
+    });
+
+    if (closing) lines.push("", closing);
+    return lines.join("\n");
+  }
+
   $("#copyWish").addEventListener("click", function () {
     if (!currentRecord) return;
-    copyText(window.WishEngine.toText(currentRecord));
+    copyText(testimonyText(currentRecord));
   });
 
   function copyText(text) {
@@ -966,6 +1107,12 @@
   });
 
   /* ---------------- boot ---------------- */
+
+  window.WishWillow = {
+    getRecord: function () { return currentRecord; },
+    toast: toast,
+    closeAnswer: closeAnswer
+  };
 
   function boot() {
     buildWorld();
