@@ -40,6 +40,12 @@
     if (window.WillowAudio) window.WillowAudio.chime(hard);
   }
 
+  function sfx(name) {
+    if (window.WillowAudio && typeof window.WillowAudio[name] === "function") {
+      window.WillowAudio[name]();
+    }
+  }
+
   function escapeHtml(value) {
     return String(value == null ? "" : value)
       .replace(/&/g, "&amp;")
@@ -103,6 +109,10 @@
     el.setAttribute("aria-hidden", "false");
     document.body.classList.add("is-mode-open");
     activeMode = name;
+    if (window.WillowAudio) {
+      window.WillowAudio.section(name === "hall");
+      window.WillowAudio.setDread(name === "hall" ? 0.24 : 0.52);
+    }
 
     if (name === "negotiation") seedNegotiation();
     if (name === "challenge") renderChallenge();
@@ -125,6 +135,10 @@
       el.setAttribute("aria-hidden", "true");
     }
     document.body.classList.remove("is-mode-open");
+    if (window.WillowAudio) {
+      window.WillowAudio.section(false);
+      window.WillowAudio.setDread(0.18);
+    }
     const previous = lastFocus;
     activeMode = null;
     lastFocus = null;

@@ -28,6 +28,20 @@
   const hollowMeta = $("#hollowMeta");
   const hollowCount = $("#hollowCount");
   const soundToggle = $("#soundToggle");
+  const soundPanelBtn = $("#soundPanelBtn");
+  const soundPanel = $("#soundPanel");
+  const masterVolume = $("#masterVolume");
+  const volumeValue = $("#volumeValue");
+  const musicToggle = $("#musicToggle");
+  const sfxToggle = $("#sfxToggle");
+  const omenMeter = $("#omenMeter");
+  const omenBar = $("#omenBar");
+  const omenLabel = $("#omenLabel");
+  const omenTrack = $("#omenTrack");
+  const answerScroll = $(".answer__scroll");
+  const answerSkip = $("#answerSkip");
+  const answerProgress = $("#answerProgress");
+  const answerRail = $("#answerRail");
   const timeBtn = $("#timeBtn");
   const timeIcon = $("#timeIcon");
   const timeLabel = $("#timeLabel");
@@ -38,6 +52,7 @@
   const REDUCE = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const STORE_KEY = "oww.hollow.v1";
   const SOUND_KEY = "oww.sound.v1";
+  const AUDIO_KEY = "oww.audio.v1";
   const LIGHT_KEY = "oww.light.v1";
   const MAX_HOLLOW = 40;
   const HOLD_MS = REDUCE ? 600 : 1250;
@@ -69,6 +84,11 @@
   let soundOn = true;
   let timePhase = "night";
   let timeSwitching = false;
+  let audioSettings = { volume: 0.72, music: true, sfx: true };
+  let revealTimers = [];
+  let revealDone = false;
+  let lastOmenTier = 0;
+  let railFrame = 0;
 
   /* ---------------- storage ---------------- */
 
@@ -140,6 +160,20 @@
     soundToggle.setAttribute("aria-pressed", soundOn ? "true" : "false");
     soundToggle.setAttribute("aria-label", soundOn ? "Mute sound" : "Enable sound");
     soundToggle.title = soundOn ? "Sound on" : "Sound off";
+    if (masterVolume) masterVolume.value = String(Math.round(audioSettings.volume * 100));
+    if (volumeValue) volumeValue.textContent = Math.round(audioSettings.volume * 100) + "%";
+    if (musicToggle) musicToggle.checked = audioSettings.music;
+    if (sfxToggle) sfxToggle.checked = audioSettings.sfx;
+  }
+
+  function saveAudioSettings() {
+    try {
+      window.localStorage.setItem(AUDIO_KEY, JSON.stringify({
+        volume: audioSettings.volume,
+        music: audioSettings.music,
+        sfx: audioSettings.sfx
+      }));
+    } catch (e) {}
   }
 
   function initSoundPreference() {
@@ -148,7 +182,23 @@
     } catch (e) {
       soundOn = true;
     }
-    if (window.WillowAudio) window.WillowAudio.enabled = soundOn;
+    try {
+      const raw = window.localStorage.getItem(AUDIO_KEY);
+      const saved = raw ? JSON.parse(raw) : null;
+      if (saved && typeof saved === "object") {
+        if (isFinite(saved.volume)) audioSettings.volume = Math.max(0, Math.min(1, Number(saved.volume)));
+        audioSettings.music = saved.music !== false;
+        audioSettings.sfx = saved.sfx !== false;
+      }
+    } catch (e) {}
+
+    if (window.WillowAudio) {
+      const A = window.WillowAudio;
+      A.enabled = soundOn;
+      A.setVolume(audioSettings.volume);
+      A.setMusicEnabled(audioSettings.music);
+      A.setSfxEnabled(audioSettings.sfx);
+    }
     applySoundUI();
   }
 
@@ -158,6 +208,53 @@
     applySoundUI();
     if (window.WillowAudio) window.WillowAudio.setEnabled(soundOn);
     if (soundOn) toast("The grove is listening.");
+  });
+
+  function setSoundPanel(open) {
+    if (!soundPanel || !soundPanelBtn) return;
+    soundPanel.hidden = !open;
+    soundPanel.classList.toggle("is-on", open);
+    soundPanelBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open && window.WillowAudio) window.WillowAudio.section(false);
+  }
+
+  if (soundPanelBtn) {
+    soundPanelBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      setSoundPanel(soundPanel.hidden);
+    });
+  }
+
+  if (masterVolume) {
+    masterVolume.addEventListener("input", function () {
+      audioSettings.volume = Math.max(0, Math.min(1, Number(masterVolume.value) / 100));
+      if (volumeValue) volumeValue.textContent = Math.round(audioSettings.volume * 100) + "%";
+      if (window.WillowAudio) window.WillowAudio.setVolume(audioSettings.volume);
+      saveAudioSettings();
+    });
+    masterVolume.addEventListener("change", function () {
+      if (window.WillowAudio) window.WillowAudio.tick();
+    });
+  }
+
+  if (musicToggle) {
+    musicToggle.addEventListener("change", function () {
+      audioSettings.music = musicToggle.checked;
+      if (window.WillowAudio) window.WillowAudio.setMusicEnabled(audioSettings.music);
+      saveAudioSettings();
+    });
+  }
+
+  if (sfxToggle) {
+    sfxToggle.addEventListener("change", function () {
+      audioSettings.sfx = sfxToggle.checked;
+      if (window.WillowAudio) window.WillowAudio.setSfxEnabled(audioSettings.sfx);
+      saveAudioSettings();
+    });
+  }
+
+  document.addEventListener("click", function (e) {
+    if (soundPanel && !soundPanel.hidden && !e.target.closest(".sound-wrap")) setSoundPanel(false);
   });
 
   /* ---------------- hours / light ---------------- */
@@ -237,7 +334,11 @@
     body.classList.add("stage-ritual");
     $("#hero").setAttribute("aria-hidden", "true");
     $("#ritual").setAttribute("aria-hidden", "false");
-    if (window.WillowAudio && soundOn) window.WillowAudio.start();
+    if (window.WillowAudio && soundOn) {
+      window.WillowAudio.start();
+      window.WillowAudio.setDread(0.14);
+      window.WillowAudio.section(false);
+    }
     setTimeout(function () {
       if (window.innerWidth > 820) wishInput.focus({ preventScroll: true });
     }, 950);
@@ -260,12 +361,64 @@
 
   /* ---------------- ritual input ---------------- */
 
+  function omenScore(text) {
+    const clean = String(text || "").replace(/\s+/g, " ").trim();
+    if (!clean) return 0;
+
+    let score = Math.min(40, clean.length * 0.68);
+    const detail = /\b(exactly|only|just|by|before|after|without|unless|until|no one|nobody|someone|everyone|forever|never|always|because|so that|in writing|witness|consent|full|entire|nothing|anything)\b/gi;
+    const absolutes = /\b(forever|never|always|everything|anything|anyone|everyone|all|nothing)\b/gi;
+    const hungers = /\b(and|also|plus|as well as)\b/gi;
+    const numbers = /\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|hundred|thousand|million|billion)\b/gi;
+    const feeling = /\b(love|happy|hate|afraid|scared|lonely|desperate|safe|free|rich|famous|beautiful|powerful|normal)\b/gi;
+
+    score += ((clean.match(detail) || []).length) * 6;
+    score += ((clean.match(numbers) || []).length) * 9;
+    score += ((clean.match(feeling) || []).length) * 5;
+    score += ((clean.match(absolutes) || []).length) * 8;
+    score += Math.max(0, ((clean.match(hungers) || []).length) - 1) * 7;
+    if (/\b(i wish|i want|i need|i hope|please|make me|let me)\b/i.test(clean)) score += 8;
+    if (/\b(willow|branch|wish)\b/i.test(clean)) score += 5;
+    if (/[?.!]/.test(clean)) score += 3;
+
+    return Math.max(0, Math.min(100, Math.round(score)));
+  }
+
+  function omenTier(score) {
+    if (score >= 84) return 4;
+    if (score >= 64) return 3;
+    if (score >= 42) return 2;
+    if (score >= 18) return 1;
+    return 0;
+  }
+
+  const OMEN_LABELS = [
+    "It has not looked up.",
+    "A leaf turns toward you.",
+    "The roots are listening.",
+    "It is reading between the words.",
+    "It has your scent now."
+  ];
+
+  function updateOmen() {
+    if (!omenMeter) return;
+    const score = omenScore(wishInput.value);
+    const tier = omenTier(score);
+    omenMeter.setAttribute("data-tier", String(tier));
+    omenBar.style.width = score + "%";
+    omenTrack.setAttribute("aria-valuenow", String(score));
+    omenLabel.textContent = OMEN_LABELS[tier];
+    if (tier > lastOmenTier && window.WillowAudio) window.WillowAudio.tick();
+    lastOmenTier = tier;
+  }
+
   function updateCount() {
     const len = wishInput.value.length;
     $("#charCount").textContent = String(len);
     const counter = $(".field__count");
     counter.classList.toggle("is-near", len > 145 && len < 180);
     counter.classList.toggle("is-full", len >= 180);
+    updateOmen();
   }
 
   wishInput.addEventListener("input", updateCount);
@@ -703,6 +856,7 @@
 
     const price = $("#priceSection");
     price.style.display = "none";
+    $("#inversionSection").style.display = "none";
     $("#cascadeSection").style.display = "none";
     $("#timelineSection").style.display = "none";
     $(".answer__rituals").style.display = "none";
@@ -716,6 +870,102 @@
     disclaimer.innerHTML = "You are more than a story. <span>If you are in immediate danger, please call your local emergency number.</span>";
   }
 
+  /* ---------------- answer rail, progress, reveal ---------------- */
+
+  function clearRevealTimers() {
+    revealTimers.forEach(function (timer) { clearTimeout(timer); });
+    revealTimers = [];
+  }
+
+  function scheduleReveal(el, delay, dark) {
+    revealTimers.push(setTimeout(function () {
+      if (el) el.classList.add("is-in");
+      if (window.WillowAudio && soundOn) window.WillowAudio.section(!!dark);
+    }, delay));
+  }
+
+  function setSkipDone() {
+    if (!answerSkip) return;
+    answerSkip.classList.add("is-done");
+    answerSkip.setAttribute("aria-hidden", "true");
+  }
+
+  function finishReveal(instant) {
+    clearTimeout(typeTimer);
+    clearRevealTimers();
+    if (instant && currentRecord) {
+      const wishEl = $("#answerWish");
+      if (wishEl) wishEl.textContent = currentRecord.wish;
+    }
+    ["grantedSection", "inversionSection", "spiralSection", "cascadeSection", "timelineSection", "priceSection"].forEach(function (id) {
+      const el = document.getElementById(id);
+      if (el && el.style.display !== "none") el.classList.add("is-in");
+    });
+    revealDone = true;
+    setSkipDone();
+    if (instant && window.WillowAudio && soundOn) window.WillowAudio.click();
+    updateAnswerProgress();
+  }
+
+  function scrollToSection(id) {
+    const el = document.getElementById(id);
+    if (!el || el.style.display === "none") return;
+    const top = el.getBoundingClientRect().top - answerScroll.getBoundingClientRect().top + answerScroll.scrollTop - 24;
+    try {
+      answerScroll.scrollTo({ top: Math.max(0, top), behavior: REDUCE ? "auto" : "smooth" });
+    } catch (e) {
+      answerScroll.scrollTop = Math.max(0, top);
+    }
+    if (window.WillowAudio && soundOn) window.WillowAudio.click();
+  }
+
+  function updateAnswerProgress() {
+    if (!answerProgress || !answerRail) return;
+    const max = answerScroll.scrollHeight - answerScroll.clientHeight;
+    const pct = max > 20 ? Math.max(0, Math.min(100, (answerScroll.scrollTop / max) * 100)) : 0;
+    answerProgress.style.width = pct + "%";
+
+    const top = answerScroll.getBoundingClientRect().top;
+    let active = "";
+    $$("#answerRail button").forEach(function (btn) {
+      const sec = document.getElementById(btn.getAttribute("data-target"));
+      if (!sec || sec.style.display === "none") {
+        btn.hidden = true;
+        return;
+      }
+      btn.hidden = false;
+      const rect = sec.getBoundingClientRect();
+      if (rect.top - top <= 150) active = btn.getAttribute("data-target");
+    });
+    $$("#answerRail button").forEach(function (btn) {
+      btn.classList.toggle("is-on", btn.getAttribute("data-target") === active);
+    });
+  }
+
+  function onAnswerScroll() {
+    if (railFrame) return;
+    railFrame = window.requestAnimationFrame(function () {
+      railFrame = 0;
+      updateAnswerProgress();
+    });
+  }
+
+  function bindAnswerChrome() {
+    if (!answerRail || !answerScroll) return;
+    $$("#answerRail button").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        scrollToSection(btn.getAttribute("data-target"));
+      });
+    });
+    answerScroll.addEventListener("scroll", onAnswerScroll, { passive: true });
+    if (answerSkip) {
+      answerSkip.addEventListener("click", function () {
+        if (revealDone) return;
+        finishReveal(true);
+      });
+    }
+  }
+
   function renderAnswer(record, archive) {
     currentRecord = record;
     isArchiveView = !!archive;
@@ -724,10 +974,19 @@
     answer.setAttribute("aria-hidden", "false");
     body.classList.add("stage-answer");
     answer.scrollTop = 0;
-    $(".answer__scroll").scrollTop = 0;
+    answerScroll.scrollTop = 0;
+    clearRevealTimers();
+    revealDone = false;
+    setSoundPanel(false);
+    if (answerSkip) {
+      answerSkip.classList.remove("is-done");
+      answerSkip.removeAttribute("aria-hidden");
+    }
+    if (answerProgress) answerProgress.style.width = "0%";
 
     // reset conditional UI
     $("#grantedSection").style.display = "";
+    $("#inversionSection").style.display = "";
     $("#spiralSection").style.display = "";
     $("#priceSection").style.display = "";
     $("#cascadeSection").style.display = "";
@@ -766,6 +1025,22 @@
 
     buildObservations(record.observations);
 
+    if (window.WillowAudio) {
+      const A = window.WillowAudio;
+      A.stopHeartbeat();
+      A.stopHaunting();
+      if (record.type === "wish") {
+        const dread = Math.max(0.18, Math.min(1, (record.severity.debt || 70) / 100));
+        A.setDread(dread);
+        if (soundOn) {
+          A.startHeartbeat(dread);
+          A.startHaunting();
+        }
+      } else {
+        A.setDread(0.08);
+      }
+    }
+
     if (record.type === "gentle") {
       buildGentle(record);
     } else {
@@ -773,6 +1048,9 @@
       $("#answerGranted").textContent = record.granted;
       $("#answerTwin").textContent = record.twin || "";
       $("#answerTwin").style.display = record.twin ? "" : "none";
+
+      $("#inversionSection").style.display = record.inversion ? "" : "none";
+      $("#answerInversion").textContent = record.inversion || "";
 
       buildSpiral(record);
       buildCascade(record);
@@ -809,20 +1087,29 @@
 
     // reveal sections
     const granted = $("#grantedSection");
+    const inversion = $("#inversionSection");
     const spiral = $("#spiralSection");
     const cascade = $("#cascadeSection");
     const timeline = $("#timelineSection");
     const price = $("#priceSection");
-    granted.classList.remove("is-in");
-    spiral.classList.remove("is-in");
-    cascade.classList.remove("is-in");
-    timeline.classList.remove("is-in");
-    price.classList.remove("is-in");
-    setTimeout(function () { granted.classList.add("is-in"); }, 120);
-    setTimeout(function () { spiral.classList.add("is-in"); }, 360);
-    setTimeout(function () { cascade.classList.add("is-in"); }, 820);
-    setTimeout(function () { timeline.classList.add("is-in"); }, 1120);
-    setTimeout(function () { price.classList.add("is-in"); }, 1420);
+    [granted, inversion, spiral, cascade, timeline, price].forEach(function (el) {
+      if (el) el.classList.remove("is-in");
+    });
+
+    scheduleReveal(granted, 120, false);
+    scheduleReveal(inversion, 420, true);
+    scheduleReveal(spiral, 760, true);
+    scheduleReveal(cascade, 1080, true);
+    scheduleReveal(timeline, 1380, true);
+    scheduleReveal(price, 1680, true);
+    revealTimers.push(setTimeout(function () {
+      revealDone = true;
+      setSkipDone();
+      updateAnswerProgress();
+    }, 2100));
+
+    window.requestAnimationFrame(updateAnswerProgress);
+    setTimeout(updateAnswerProgress, 260);
 
     setTimeout(function () {
       $("#answerClose").focus({ preventScroll: true });
@@ -929,6 +1216,13 @@
   function closeAnswer(keepWish) {
     clearTimeout(typeTimer);
     clearTimeout(autoSaveTimer);
+    clearRevealTimers();
+    setSoundPanel(false);
+    if (window.WillowAudio) {
+      window.WillowAudio.stopHeartbeat();
+      window.WillowAudio.stopHaunting();
+      window.WillowAudio.setDread(0.12);
+    }
     if (currentRecord && currentRecord.type === "wish" && !isArchiveView && !isSaved(currentRecord)) {
       saveCurrent(false);
     }
@@ -963,6 +1257,7 @@
     if (clearWish) {
       wishInput.value = "";
       updateCount();
+      lastOmenTier = 0;
       ritualWarn.classList.remove("is-on");
     }
   }
@@ -981,7 +1276,9 @@
 
   window.addEventListener("keydown", function (e) {
     if (e.key === "Escape") {
-      if (drawer.classList.contains("is-open")) {
+      if (soundPanel && !soundPanel.hidden) {
+        setSoundPanel(false);
+      } else if (drawer.classList.contains("is-open")) {
         closeDrawer();
       } else if (answer.classList.contains("is-on")) {
         closeAnswer(true);
@@ -1108,6 +1405,20 @@
 
   /* ---------------- boot ---------------- */
 
+  function bindUiAudio() {
+    document.addEventListener("pointerover", function (e) {
+      if (!window.WillowAudio) return;
+      const hit = e.target.closest && e.target.closest("button, a[href], input[type=range]");
+      if (hit) window.WillowAudio.hover();
+    }, { passive: true });
+
+    document.addEventListener("click", function (e) {
+      if (!window.WillowAudio) return;
+      const hit = e.target.closest && e.target.closest("button, a[href]");
+      if (hit) window.WillowAudio.click();
+    });
+  }
+
   window.WishWillow = {
     getRecord: function () { return currentRecord; },
     toast: toast,
@@ -1119,6 +1430,8 @@
     startCursor();
     initSoundPreference();
     initTimePreference();
+    bindAnswerChrome();
+    bindUiAudio();
 
     hollow = readHollow().filter(function (r) {
       return r && typeof r.wish === "string";

@@ -12,14 +12,29 @@
   const A = {
     ctx: null,
     master: null,
+    fxOut: null,
+    musicBus: null,
     reverb: null,
     wet: null,
+    musicReverb: null,
+    musicWet: null,
     noiseBuffer: null,
     enabled: true,
     started: false,
+    musicEnabled: true,
+    sfxEnabled: true,
+    _volume: 0.72,
     _chimeTimer: null,
     _droneBus: null,
     _holdNodes: null,
+    _musicFilter: null,
+    _voices: [],
+    _chordTimer: null,
+    _scoreTimer: null,
+    _hauntTimer: null,
+    _heartTimer: null,
+    _dread: 0,
+    _lastHover: 0,
 
     init: function () {
       if (this.ctx) return true;
@@ -36,16 +51,34 @@
       this.master.gain.value = 0;
       this.master.connect(ctx.destination);
 
+      this.fxOut = ctx.createGain();
+      this.fxOut.gain.value = this.sfxEnabled ? 1 : 0.0001;
+      this.fxOut.connect(this.master);
+
+      this.musicBus = ctx.createGain();
+      this.musicBus.gain.value = this.musicEnabled ? 1 : 0.0001;
+      this.musicBus.connect(this.master);
+
+      const impulse = this.makeImpulse(3.2, 2.4);
+
       this.reverb = ctx.createConvolver();
-      this.reverb.buffer = this.makeImpulse(3.2, 2.4);
+      this.reverb.buffer = impulse;
       this.wet = ctx.createGain();
       this.wet.gain.value = 0.5;
       this.reverb.connect(this.wet);
       this.wet.connect(this.master);
 
+      this.musicReverb = ctx.createConvolver();
+      this.musicReverb.buffer = impulse;
+      this.musicWet = ctx.createGain();
+      this.musicWet.gain.value = 0.55;
+      this.musicReverb.connect(this.musicWet);
+      this.musicWet.connect(this.musicBus);
+
       this.noiseBuffer = this.makeNoise(4);
       this.buildWind();
       this.buildDrone();
+      this.buildScore();
       return true;
     },
 
@@ -84,6 +117,14 @@
       g.connect(this.reverb);
     },
 
+    sendMusic: function (node, amount) {
+      if (!this.musicReverb) return;
+      const g = this.ctx.createGain();
+      g.gain.value = amount;
+      node.connect(g);
+      g.connect(this.musicReverb);
+    },
+
     ensure: function () {
       if (!this.ctx) this.init();
       if (this.ctx && this.ctx.state === "suspended") {
@@ -99,11 +140,11 @@
         const now = this.ctx.currentTime;
         this.master.gain.cancelScheduledValues(now);
         this.master.gain.setValueAtTime(Math.max(this.master.gain.value, 0.0001), now);
-        this.master.gain.linearRampToValueAtTime(this.enabled ? 0.85 : 0.0001, now + 2.2);
+        this.master.gain.linearRampToValueAtTime(this.enabled ? this._volume : 0.0001, now + 2.2);
         this.scheduleChime();
         setTimeout(function () { A.chime(); }, 900);
       } else if (this.enabled) {
-        this.master.gain.linearRampToValueAtTime(0.85, this.ctx.currentTime + 0.6);
+        this.master.gain.linearRampToValueAtTime(this._volume, this.ctx.currentTime + 0.6);
       }
     },
 
@@ -116,8 +157,41 @@
       const now = this.ctx.currentTime;
       this.master.gain.cancelScheduledValues(now);
       this.master.gain.setValueAtTime(Math.max(this.master.gain.value, 0.0001), now);
-      this.master.gain.linearRampToValueAtTime(this.enabled ? 0.85 : 0.0001, now + 0.5);
+      this.master.gain.linearRampToValueAtTime(this.enabled ? this._volume : 0.0001, now + 0.5);
       if (this.enabled && !this.started) this.start();
+    },
+
+    setVolume: function (value) {
+      const v = Math.max(0, Math.min(1, Number(value)));
+      this._volume = v;
+      if (!this.ctx) return;
+      if (!this.enabled) return;
+      const now = this.ctx.currentTime;
+      this.master.gain.cancelScheduledValues(now);
+      this.master.gain.setValueAtTime(Math.max(this.master.gain.value, 0.0001), now);
+      this.master.gain.linearRampToValueAtTime(Math.max(0.0001, v), now + 0.25);
+    },
+
+    setMusicEnabled: function (on) {
+      this.musicEnabled = !!on;
+      if (!this.ctx || !this.musicBus) return;
+      const now = this.ctx.currentTime;
+      this.musicBus.gain.cancelScheduledValues(now);
+      this.musicBus.gain.setValueAtTime(Math.max(this.musicBus.gain.value, 0.0001), now);
+      this.musicBus.gain.linearRampToValueAtTime(this.musicEnabled ? 1 : 0.0001, now + 0.6);
+    },
+
+    setSfxEnabled: function (on) {
+      this.sfxEnabled = !!on;
+      if (!this.ctx || !this.fxOut) return;
+      const now = this.ctx.currentTime;
+      this.fxOut.gain.cancelScheduledValues(now);
+      this.fxOut.gain.setValueAtTime(Math.max(this.fxOut.gain.value, 0.0001), now);
+      this.fxOut.gain.linearRampToValueAtTime(this.sfxEnabled ? 1 : 0.0001, now + 0.3);
+    },
+
+    out: function () {
+      return this.fxOut || this.master;
     },
 
     buildWind: function () {
@@ -142,8 +216,8 @@
       src.connect(bp);
       bp.connect(lp);
       lp.connect(g);
-      g.connect(this.master);
-      this.send(g, 0.18);
+      g.connect(this.musicBus);
+      this.sendMusic(g, 0.18);
       src.start();
 
       const lfo = ctx.createOscillator();
@@ -169,8 +243,8 @@
       const ctx = this.ctx;
       const bus = ctx.createGain();
       bus.gain.value = 0.7;
-      bus.connect(this.master);
-      this.send(bus, 0.3);
+      bus.connect(this.musicBus);
+      this.sendMusic(bus, 0.3);
       this._droneBus = bus;
 
       const freqs = [
@@ -206,12 +280,344 @@
       trem.start();
     },
 
+    buildScore: function () {
+      const ctx = this.ctx;
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.value = 980;
+      filter.Q.value = 0.8;
+      filter.connect(this.musicBus);
+      this._musicFilter = filter;
+
+      const chords = [
+        [73.42, 110.0, 146.83, 174.61],
+        [58.27, 87.31, 116.54, 146.83],
+        [49.0, 73.42, 98.0, 146.83],
+        [55.0, 82.41, 110.0, 164.81]
+      ];
+      const self = this;
+      this._voices = chords[0].map(function (freq, i) {
+        const o = ctx.createOscillator();
+        o.type = i < 2 ? "triangle" : "sine";
+        o.frequency.value = freq;
+        o.detune.value = [-7, 4, -3, 6][i];
+        const g = ctx.createGain();
+        g.gain.value = [0.025, 0.02, 0.012, 0.008][i];
+        const lfo = ctx.createOscillator();
+        lfo.type = "sine";
+        lfo.frequency.value = 0.035 + i * 0.011;
+        const lg = ctx.createGain();
+        lg.gain.value = [0.008, 0.006, 0.004, 0.003][i];
+        lfo.connect(lg);
+        lg.connect(g.gain);
+        o.connect(g);
+        g.connect(filter);
+        o.start();
+        lfo.start();
+        return { o: o, g: g };
+      });
+
+      let chord = 0;
+      this._chordTimer = setInterval(function () {
+        if (!self.ctx || !self.started) return;
+        chord = (chord + 1) % chords.length;
+        const now = ctx.currentTime;
+        chords[chord].forEach(function (freq, i) {
+          const voice = self._voices[i];
+          if (!voice) return;
+          voice.o.frequency.cancelScheduledValues(now);
+          voice.o.frequency.setValueAtTime(voice.o.frequency.value, now);
+          voice.o.frequency.linearRampToValueAtTime(freq, now + 5.5);
+        });
+      }, 15000);
+    },
+
+    scoreNote: function () {
+      if (!this.ctx || !this.enabled || !this.musicEnabled) return;
+      const ctx = this.ctx;
+      const t = ctx.currentTime + 0.02;
+      const scale = [293.66, 311.13, 349.23, 392.0, 440.0, 523.25, 587.33];
+      const f = scale[Math.floor(Math.random() * scale.length)] * (Math.random() < 0.22 ? 0.5 : 1);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.023, t + 0.04);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 5.2);
+      const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+      if (pan) pan.pan.value = Math.random() * 1.6 - 0.8;
+      [1, 2.004].forEach(function (mult, i) {
+        const o = ctx.createOscillator();
+        o.type = "sine";
+        o.frequency.value = f * mult;
+        const og = ctx.createGain();
+        og.gain.value = i ? 0.16 : 0.8;
+        o.connect(og);
+        og.connect(g);
+        o.start(t);
+        o.stop(t + 5.4);
+      });
+      if (pan) {
+        g.connect(pan);
+        pan.connect(this.musicBus);
+        this.sendMusic(pan, 0.55);
+      } else {
+        g.connect(this.musicBus);
+        this.sendMusic(g, 0.55);
+      }
+    },
+
+    setDread: function (level) {
+      const v = Math.max(0, Math.min(1, Number(level) || 0));
+      this._dread = v;
+      if (!this.ctx) return;
+      const now = this.ctx.currentTime;
+      if (this._musicFilter) {
+        this._musicFilter.frequency.cancelScheduledValues(now);
+        this._musicFilter.frequency.setValueAtTime(this._musicFilter.frequency.value, now);
+        this._musicFilter.frequency.linearRampToValueAtTime(1080 - v * 620, now + 0.8);
+      }
+      if (this._droneBus) {
+        this._droneBus.gain.cancelScheduledValues(now);
+        this._droneBus.gain.setValueAtTime(this._droneBus.gain.value, now);
+        this._droneBus.gain.linearRampToValueAtTime(0.66 + v * 0.42, now + 0.8);
+      }
+    },
+
+    heartbeat: function () {
+      if (!this.ctx || !this.enabled || !this.sfxEnabled) return;
+      const ctx = this.ctx;
+      const t = ctx.currentTime + 0.01;
+      [0, 0.17].forEach(function (offset, i) {
+        const o = ctx.createOscillator();
+        o.type = "sine";
+        o.frequency.setValueAtTime(62, t + offset);
+        o.frequency.exponentialRampToValueAtTime(33, t + offset + 0.19);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t + offset);
+        g.gain.linearRampToValueAtTime(i ? 0.045 : 0.075, t + offset + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + offset + 0.28);
+        o.connect(g);
+        g.connect(A.out());
+        A.send(g, 0.2);
+        o.start(t + offset);
+        o.stop(t + offset + 0.34);
+      });
+    },
+
+    startHeartbeat: function (level) {
+      this.stopHeartbeat();
+      if (!this.ctx) return;
+      this.setDread(level == null ? this._dread : level);
+      const self = this;
+      (function beat() {
+        if (!self.ctx || !self.enabled) return;
+        self.heartbeat();
+        const gap = 1450 - self._dread * 580;
+        self._heartTimer = setTimeout(beat, gap);
+      })();
+    },
+
+    stopHeartbeat: function () {
+      clearTimeout(this._heartTimer);
+      this._heartTimer = null;
+    },
+
+    startHaunting: function () {
+      if (!this.ctx || this._hauntTimer) return;
+      const self = this;
+      (function haunt() {
+        if (!self.ctx || !self.enabled) return;
+        if (Math.random() < 0.62) self.whisper();
+        else self.creak();
+        self._hauntTimer = setTimeout(haunt, 9000 + Math.random() * 13000);
+      })();
+    },
+
+    stopHaunting: function () {
+      clearTimeout(this._hauntTimer);
+      this._hauntTimer = null;
+    },
+
+    riser: function (seconds) {
+      if (!this.ctx || !this.enabled || !this.sfxEnabled) return;
+      const ctx = this.ctx;
+      const dur = Math.max(0.8, seconds || 2.2);
+      const t = ctx.currentTime + 0.01;
+
+      const src = ctx.createBufferSource();
+      src.buffer = this.noiseBuffer;
+      src.loop = true;
+      const bp = ctx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.setValueAtTime(180, t);
+      bp.frequency.exponentialRampToValueAtTime(3200, t + dur);
+      bp.Q.value = 1.4;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.09, t + dur * 0.86);
+      g.gain.linearRampToValueAtTime(0.0001, t + dur);
+      src.connect(bp);
+      bp.connect(g);
+      g.connect(this.out());
+      this.send(g, 0.7);
+      src.start(t);
+      src.stop(t + dur + 0.1);
+
+      const sub = ctx.createOscillator();
+      sub.type = "sine";
+      sub.frequency.setValueAtTime(34, t);
+      sub.frequency.exponentialRampToValueAtTime(58, t + dur);
+      const sg = ctx.createGain();
+      sg.gain.setValueAtTime(0.0001, t);
+      sg.gain.linearRampToValueAtTime(0.055, t + dur * 0.8);
+      sg.gain.linearRampToValueAtTime(0.0001, t + dur);
+      sub.connect(sg);
+      sg.connect(this.out());
+      sub.start(t);
+      sub.stop(t + dur + 0.1);
+    },
+
+    click: function () {
+      if (!this.ctx || !this.enabled || !this.sfxEnabled) return;
+      const ctx = this.ctx;
+      const t = ctx.currentTime + 0.005;
+      const o = ctx.createOscillator();
+      o.type = "sine";
+      o.frequency.setValueAtTime(440, t);
+      o.frequency.exponentialRampToValueAtTime(280, t + 0.045);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.032, t + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
+      o.connect(g);
+      g.connect(this.out());
+      o.start(t);
+      o.stop(t + 0.08);
+    },
+
+    hover: function () {
+      if (!this.ctx || !this.enabled || !this.sfxEnabled) return;
+      const now = this.ctx.currentTime;
+      if (now - this._lastHover < 0.09) return;
+      this._lastHover = now;
+      const t = now + 0.005;
+      const o = this.ctx.createOscillator();
+      o.type = "sine";
+      o.frequency.setValueAtTime(1180, t);
+      o.frequency.exponentialRampToValueAtTime(900, t + 0.035);
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.009, t + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+      o.connect(g);
+      g.connect(this.out());
+      o.start(t);
+      o.stop(t + 0.06);
+    },
+
+    tick: function () {
+      if (!this.ctx || !this.enabled || !this.sfxEnabled) return;
+      const t = this.ctx.currentTime + 0.005;
+      const o = this.ctx.createOscillator();
+      o.type = "triangle";
+      o.frequency.setValueAtTime(1320, t);
+      o.frequency.exponentialRampToValueAtTime(980, t + 0.03);
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.018, t + 0.003);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.055);
+      o.connect(g);
+      g.connect(this.out());
+      o.start(t);
+      o.stop(t + 0.07);
+    },
+
+    splinter: function () {
+      if (!this.ctx || !this.enabled || !this.sfxEnabled) return;
+      const t = this.ctx.currentTime + 0.005;
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.noiseBuffer;
+      const bp = this.ctx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.setValueAtTime(2600, t);
+      bp.frequency.exponentialRampToValueAtTime(900, t + 0.06);
+      bp.Q.value = 2.4;
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.05, t + 0.003);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+      src.connect(bp);
+      bp.connect(g);
+      g.connect(this.out());
+      this.send(g, 0.3);
+      src.start(t);
+      src.stop(t + 0.1);
+    },
+
+    section: function (dark) {
+      if (!this.ctx || !this.enabled || !this.sfxEnabled) return;
+      const t = this.ctx.currentTime + 0.01;
+      const f = dark ? 98 : 146.83;
+      [1, 1.5, 2.01].forEach(function (mult, i) {
+        const o = A.ctx.createOscillator();
+        o.type = "sine";
+        o.frequency.value = f * mult;
+        const g = A.ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime([0.035, 0.016, 0.008][i], t + 0.05);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 2.8);
+        o.connect(g);
+        g.connect(A.out());
+        A.send(g, 0.6);
+        o.start(t);
+        o.stop(t + 3);
+      });
+    },
+
+    verdict: function () {
+      if (!this.ctx || !this.enabled || !this.sfxEnabled) return;
+      const ctx = this.ctx;
+      const t = ctx.currentTime + 0.01;
+      const o = ctx.createOscillator();
+      o.type = "sine";
+      o.frequency.setValueAtTime(92, t);
+      o.frequency.exponentialRampToValueAtTime(28, t + 1.2);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.24, t + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.5);
+      o.connect(g);
+      g.connect(this.out());
+      this.send(g, 0.5);
+      o.start(t);
+      o.stop(t + 1.6);
+      this.section(true);
+    },
+
+    error: function () {
+      if (!this.ctx || !this.enabled || !this.sfxEnabled) return;
+      const ctx = this.ctx;
+      const t = ctx.currentTime + 0.01;
+      [80, 84.5].forEach(function (f) {
+        const o = ctx.createOscillator();
+        o.type = "triangle";
+        o.frequency.value = f;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(0.023, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.34);
+        o.connect(g);
+        g.connect(A.out());
+        o.start(t);
+        o.stop(t + 0.36);
+      });
+    },
+
     scheduleChime: function () {
       const self = this;
       clearTimeout(this._chimeTimer);
-      const wait = 7000 + Math.random() * 12000;
+      const wait = 8000 + Math.random() * 10000;
       this._chimeTimer = setTimeout(function () {
-        if (self.enabled) self.chime();
+        if (self.enabled) self.scoreNote();
         self.scheduleChime();
       }, wait);
     },
@@ -244,10 +650,10 @@
 
       if (pan) {
         g.connect(pan);
-        pan.connect(this.master);
+        pan.connect(this.out());
         this.send(pan, 0.7);
       } else {
-        g.connect(this.master);
+        g.connect(this.out());
         this.send(g, 0.7);
       }
     },
@@ -269,7 +675,7 @@
       tg.gain.linearRampToValueAtTime(0.42, t + 0.006);
       tg.gain.exponentialRampToValueAtTime(0.0001, t + 0.62);
       thud.connect(tg);
-      tg.connect(this.master);
+      tg.connect(this.out());
       this.send(tg, 0.4);
       thud.start(t);
       thud.stop(t + 0.7);
@@ -290,7 +696,7 @@
         ng.gain.exponentialRampToValueAtTime(0.0001, dt + 0.16);
         src.connect(bp);
         bp.connect(ng);
-        ng.connect(this.master);
+        ng.connect(this.out());
         this.send(ng, 0.45);
         src.start(dt);
         src.stop(dt + 0.2);
@@ -306,7 +712,7 @@
       cg.gain.linearRampToValueAtTime(0.07, t + 0.002);
       cg.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
       click.connect(cg);
-      cg.connect(this.master);
+      cg.connect(this.out());
       click.start(t);
       click.stop(t + 0.07);
 
@@ -347,7 +753,7 @@
 
       src.connect(bp);
       bp.connect(g);
-      g.connect(this.master);
+      g.connect(this.out());
       this.send(g, 0.9);
       src.start(t);
       src.stop(t + 2.6);
@@ -372,7 +778,7 @@
       g.gain.linearRampToValueAtTime(0.0001, t + 1.34);
       src.connect(bp);
       bp.connect(g);
-      g.connect(this.master);
+      g.connect(this.out());
       this.send(g, 0.6);
       src.start(t);
       src.stop(t + 1.4);
@@ -397,7 +803,7 @@
       g.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
       o.connect(lp);
       lp.connect(g);
-      g.connect(this.master);
+      g.connect(this.out());
       this.send(g, 0.5);
       o.start(t);
       o.stop(t + 0.45);
@@ -421,7 +827,7 @@
 
       o.connect(lp);
       lp.connect(g);
-      g.connect(this.master);
+      g.connect(this.out());
       this.send(g, 0.4);
       o.start(t);
       this._holdNodes = { o: o, g: g };

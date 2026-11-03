@@ -192,6 +192,7 @@
 
     const coda = pick(rand, DATA.codas);
     const codaTitle = pick(rand, DATA.codaTitles);
+    const inversion = pick(rand, domain.inversions || DATA.inversions || []);
 
     const tags = [];
     [domain.label, pick(rand, DATA.tags), domain.cost].forEach(function (t) {
@@ -222,6 +223,7 @@
       secondPerson: secondPerson(wish),
       observations: observationsFor(wish, rand),
       granted: granted,
+      inversion: inversion,
       twin: twin,
       twists: [
         { tag: "THE FIRST CRACK", title: first.title, text: first.text },
@@ -269,6 +271,9 @@
       record.granted,
       ""
     ];
+    if (record.inversion) {
+      lines.push("THE OPPOSITE", record.inversion, "");
+    }
     if (record.twin) lines.push(record.twin, "");
     lines.push("THE SPIRAL");
     record.twists.forEach(function (t, i) {

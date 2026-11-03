@@ -812,6 +812,131 @@
 
   });
 
+  /* ---------------- the opposite ----------------
+     Every wish is answered with its exact inverse. These lines name the
+     thing that was wanted, then take it away in the most literal way
+     the willow can arrange. Two per domain, plus a fallback set. */
+
+  const INVERSIONS = {
+    love: [
+      "You asked to be loved. So the willow removes the wanting: everyone will be kind to you, and no one will need you, and you will spend years pressing the place where longing used to be.",
+      "You asked for someone to choose you. The willow chooses no one. You will be admired, thanked and left, and you will mistake the leaving for a kind of freedom.",
+      "You asked to be held. It grants the opposite: a life so spacious that your arms forget their shape, and every room you enter is already full of people who do not turn."
+    ],
+    money: [
+      "You asked for enough. It grants the opposite of enough: you will never want for anything again, and want itself will leave you, and you will not know what to do with your hands.",
+      "You asked to be rich. It makes you poor in the only currency it cannot print: every door will open, and no one will be waiting behind any of them.",
+      "You asked for money. It grants the absence of need — a flat, clean, well-lit life in which nothing is at stake and no one ever asks you for anything."
+    ],
+    fame: [
+      "You asked to be remembered. It grants the opposite: you will be forgotten while still in the room, and you will learn to introduce yourself twice.",
+      "You asked for an audience. The willow empties the theatre and leaves the lights on, and you will perform for years before you notice.",
+      "You asked to matter to strangers. It makes you matter to no one, intimately and completely, and calls that privacy."
+    ],
+    beauty: [
+      "You asked to be seen. It grants invisibility: people will look through you kindly, and you will become expert at the sound of your own name not being said.",
+      "You asked for a face that stops the room. The room will not stop. It will pass through you, and you will learn that being unnoticed is a kind of weather.",
+      "You asked to be beautiful. It gives you the opposite: a body no one desires, and a mind that finally has time to become something else."
+    ],
+    power: [
+      "You asked to be obeyed. It grants disobedience: no one will do what you say, and you will discover how much of you was only ever a command.",
+      "You asked for control. It gives you a life in which nothing needs controlling, and you will go looking for a lever until your hands are empty.",
+      "You asked to be feared. It makes you harmless. You will be loved easily and taken lightly, and no one will ever lower their voice for you."
+    ],
+    revenge: [
+      "You asked them to suffer. It grants mercy instead: they will be forgiven, prosper, and forget you, and you will carry the whole weight of the wish alone.",
+      "You asked for justice. It gives you the opposite: a world in which nothing is owed to you, and the wound closes without ever being answered.",
+      "You asked to make them pay. The willow pays them. You will watch them become happy, and you will be the only one still counting."
+    ],
+    death: [
+      "You asked for forever. It grants an ending: everything you love will complete itself, and you will be there for all of it, awake.",
+      "You asked to never die. The willow gives you a death so ordinary it arrives on a Tuesday, and the world closes over you without a sound.",
+      "You asked to bring them back. It lets them stay gone, and gives you the opposite of grief: a clean, quiet absence that never visits you."
+    ],
+    time: [
+      "You asked for more time. It grants the opposite: every hour will arrive already spent, and you will live in the aftertaste of a day you cannot enter.",
+      "You asked to go back. It gives you only forward, faster, with no door behind you and no version of the past that will take your call.",
+      "You asked to undo it. The willow makes it permanent, and gives you a memory with no seam, so you cannot even find the place to press."
+    ],
+    health: [
+      "You asked to be well. It grants the opposite of illness and the opposite of healing: a body that never complains and never once feels like yours.",
+      "You asked for the pain to stop. It stops, and takes the warning with it; you will not notice what is breaking until it is already gone.",
+      "You asked to be cured. The willow makes you unremarkable: no one will worry about you again, and you will miss the worrying more than the pain."
+    ],
+    family: [
+      "You asked not to be alone. It grants solitude: a full house, a table set for many, and no one who will ever ask how you are.",
+      "You asked for the family you wanted. It gives you strangers who share your name, and a home that is only a building with your things in it.",
+      "You asked for a child. The willow gives you the opposite: a life with no one to pass it to, and all the time in the world to notice."
+    ],
+    memory: [
+      "You asked to forget. It grants total recall: every kind word and every crueller one, in order, with dates, forever.",
+      "You asked to lose the memory. It gives you the opposite: a past so clear it crowds out the present, and you will live in rooms that no longer exist.",
+      "You asked to be free of it. The willow makes it the only thing you can see, and builds your whole life around a door you cannot close."
+    ],
+    knowledge: [
+      "You asked to know. It grants the opposite: a life of comfortable not-knowing, in which every answer arrives just after you stop needing it.",
+      "You asked for the truth. It gives you doubt, endlessly renewable, and you will be wrong in ways that feel exactly like certainty.",
+      "You asked to understand. The willow makes you simple and content, and you will never once suspect what was taken."
+    ],
+    freedom: [
+      "You asked to be free. It grants belonging: a warm room, a hundred small obligations, and a key you will never need.",
+      "You asked to escape. It gives you nowhere to go and no one to escape from, and you will spend years looking for the wall.",
+      "You asked for no cage. The willow gives you open sky, and you will discover that freedom is only another word for falling."
+    ],
+    luck: [
+      "You asked for luck. It grants fairness: everything you get, you will earn exactly, and nothing will ever arrive unasked.",
+      "You asked to win. It gives you the opposite: a life in which no one keeps score, and every victory dissolves before you can hold it.",
+      "You asked for things to go your way. The willow makes every way equally possible, and you will stand at the centre of your life unable to choose."
+    ],
+    career: [
+      "You asked to succeed. It grants obscurity: work that matters to no one, done well, in a room with no window, for years.",
+      "You asked for the promotion. It gives you the opposite: no one expects anything of you again, and you will miss the weight.",
+      "You asked to be indispensable. The willow makes you replaceable, and you will watch yourself be replaced by someone kinder and cheaper."
+    ],
+    superpower: [
+      "You asked to be extraordinary. It grants the opposite: a life so ordinary that nothing you do leaves a mark, and no one will ever ask you to save them.",
+      "You asked for power. It gives you invisibility, and you will learn that being unseen is not the same as being safe.",
+      "You asked to fly. The willow keeps you on the ground, and gives you a body that will never fail you in a way anyone notices."
+    ],
+    world: [
+      "You asked to save the world. It grants the opposite: the world saves itself, and you are not in the version it saves.",
+      "You asked for peace. The willow gives you a quiet so complete that no one needs to be kind, and you will miss the argument.",
+      "You asked to end suffering. It ends the people who suffer, gently, in their sleep, and calls it mercy."
+    ],
+    belonging: [
+      "You asked to belong. It grants solitude: a seat at every table and no one who notices when you leave it.",
+      "You asked for friends. The willow gives you a crowd that knows your name and nothing else, and you will be lonely in the exact shape of your wish.",
+      "You asked to fit in. It makes you shapeless, and you will fit everywhere and be held nowhere."
+    ],
+    joy: [
+      "You asked to be happy. It grants the opposite: nothing will hurt you again, and nothing will please you either, and you will call the flatness peace.",
+      "You asked for joy. The willow removes the grief, and the furniture of your life comes apart quietly, and you do not have the words to miss it.",
+      "You asked not to be sad. It gives you a life with no weather, and you will spend years looking for a window."
+    ],
+    pets: [
+      "You asked for a companion. It grants the opposite: no animal will ever choose you, and you will be loved only by things that cannot stay.",
+      "You asked to be loved without conditions. The willow gives you a house with no heartbeat in it, and all the quiet you thought you wanted.",
+      "You asked for something small to take care of. It gives you nothing to take care of, and you will learn how heavy an empty hand is."
+    ],
+    default: [
+      "You asked for the thing. The willow grants its opposite, precisely, and calls the difference a translation error.",
+      "You asked to have. It grants the absence of having, and gives you a life in which the shape of the want is all that remains.",
+      "You asked. It heard the opposite in your voice, and it has already begun."
+    ]
+  };
+
+  Object.keys(INVERSIONS).forEach(function (id) {
+    if (D[id]) D[id].inversions = INVERSIONS[id];
+  });
+
+  window.WISH_DATA.inversions = [
+    "You asked for the thing. The willow grants its absence, then teaches you to miss it in a language you did not know you spoke.",
+    "You asked to be given something. It gives you the hollow shape of it, and the shape is exactly your size.",
+    "You asked for more. The willow makes you the kind of person who no longer notices when there is less.",
+    "You asked it to change your life. It removes the life, and leaves the change standing in the room.",
+    "You asked for the opposite of what you fear. The willow grants the fear, and takes away the thing that made it bearable."
+  ];
+
   /* ---------------- shared prose ---------------- */
 
   window.WISH_DATA.openers = [

@@ -207,7 +207,18 @@
     "The price is paid by someone who never met you.",
     "You start measuring other people by what they cost.",
     "The wish works better than you can survive.",
-    "A door closes softly in a room you did not know you had."
+    "A door closes softly in a room you did not know you had.",
+    "The person you were before the wish starts appearing in mirrors, asking to be let back in.",
+    "You get the opposite in installments, and each one is presented as a kindness.",
+    "One morning you wake up without the hunger. That is when you understand what the hunger was holding up.",
+    "The people who love you begin to speak about you in the past tense while you are still in the room.",
+    "You find a list in your own handwriting of everything you agreed to. You do not remember writing it.",
+    "Every good thing now arrives with a small delay, like a sentence being translated.",
+    "The willow does not take the wish back. It takes back the person who made it.",
+    "You are given exactly what you wanted, and the world is rearranged so that it means nothing.",
+    "A kind of quiet enters your life and starts removing the furniture one piece at a time.",
+    "You keep waiting for the catch. The catch is that there is no catch; this is simply your life now.",
+    "One day the wish stops working, and you realize you have built nothing that runs without it."
   ];
 
   /* ---------------- cascade ---------------- */
@@ -256,28 +267,28 @@
         when: "One week",
         mark: "01",
         title: "Small mercies",
-        text: "Nothing feels wrong yet. The wish has only rearranged the timing of things — a green light, a returned message, a bill that arrives a day late. " + pick(0, 0, "You call this luck."),
+        text: "Nothing feels wrong yet. That is the first mercy, and the last. The wish has begun editing the timing of things — a green light, a returned message, a bill that arrives a day late. " + pick(0, 0, "You call this luck."),
         mood: "still"
       },
       {
         when: "One month",
         mark: "02",
         title: "The workaround",
-        text: "You have started building a life around the part you did not ask for. " + pick(1, 2, "It is not a problem yet.") + " It is a habit.",
+        text: "You have started building a life around the part you did not ask for. " + pick(1, 2, "It is not a problem yet.") + " You call it a habit. The people who notice have begun to say your name a little more carefully.",
         mood: "uneasy"
       },
       {
         when: "One year",
         mark: "03",
         title: "The new normal",
-        text: pick(2, 1, "You have stopped explaining it to new people.") + " You have stopped explaining it to new people. Explanation makes it sound like a choice.",
+        text: pick(2, 1, "You have stopped explaining it to new people.") + " The people who knew you before have quietly stopped asking. You tell yourself this is peace. It is closer to a room with the furniture removed.",
         mood: "wrong"
       },
       {
         when: "Ten years",
         mark: "04",
         title: "The invoice",
-        text: record.price + " " + pick(3, 3, "By now the price has a face.") + " By now the price has a face, and the face knows your name.",
+        text: record.price + " " + pick(3, 3, "By now the price has a face.") + " By now the price has a face, and the face is patient, and it knows exactly which version of you to ask for.",
         mood: "paid"
       }
     ];
@@ -293,7 +304,11 @@
     "You asked for consent. It asked for a signature you have already given.",
     "You specified the amount. It specified the currency.",
     "You wrote a witness into the clause. The witness is the willow.",
-    "You made the wish reversible. You did not make the remembering reversible."
+    "You made the wish reversible. You did not make the remembering reversible.",
+    "You said no one else would pay. It has decided you are no one else.",
+    "You asked for the opposite of harm. It has arranged an absence so complete that you will beg for the harm.",
+    "You closed every door in the sentence. It is standing in the room the sentence did not mention.",
+    "You made the wish safe. The willow has never granted a safe thing without making someone pay for the safety."
   ];
 
   function scoreLoopholes(raw) {
@@ -370,11 +385,11 @@
     const debt = clamp(Math.round(baseDebt - score * 0.55), 18, 96);
     const residual = RESIDUALS[(Math.floor(score / 7) + (attempt || 0)) % RESIDUALS.length];
 
-    let verdict = "You have not negotiated. You have only rephrased your surrender.";
-    if (score >= 93) verdict = "You closed every door you could see. The willow is already standing behind the one you did not.";
-    else if (score >= 80) verdict = "A serious revision. The visible cracks narrow. The price moves somewhere less visible.";
-    else if (score >= 65) verdict = "Better. But \"better\" is not a word the willow honours.";
-    else if (score >= 45) verdict = "The wording is tighter. The hunger is still showing through.";
+    let verdict = "You have not negotiated. You have only taught the surrender a nicer vocabulary.";
+    if (score >= 93) verdict = "You closed every door you could see. The willow is already standing behind the one you did not, holding the opposite of your wish.";
+    else if (score >= 80) verdict = "A serious revision. The visible cracks narrow. The price moves somewhere less visible, and it takes a name with it.";
+    else if (score >= 65) verdict = "Better. But \"better\" is not a word the willow honours. It has kept the difference as a tip.";
+    else if (score >= 45) verdict = "The wording is tighter. The hunger is still showing through, and the hunger is the only part it wanted.";
 
     return {
       score: score,
@@ -398,10 +413,10 @@
   }
 
   function challengeVerdict(score) {
-    if (score >= 92) return { label: "SIGNED", text: "The willow has your signature. It always did. Somewhere, a third branch is still growing." };
-    if (score >= 78) return { label: "COMPOUNDING", text: "You fixed two things and made a third worse. The willow calls this a good year." };
-    if (score >= 60) return { label: "NEGOTIABLE", text: "The damage is legible. That is not the same as repaired. The willow is willing to discuss terms." };
-    return { label: "STILL STANDING", text: "The corruption is low. Do not celebrate yet. The willow is only waiting for the interest to accrue." };
+    if (score >= 92) return { label: "SIGNED", text: "The willow has your signature. It always did. Somewhere, a third branch is still growing through the hand that wrote the wish." };
+    if (score >= 78) return { label: "COMPOUNDING", text: "You fixed two things and made a third worse. The willow calls this a good year, and it has already begun the next one." };
+    if (score >= 60) return { label: "NEGOTIABLE", text: "The damage is legible. That is not the same as repaired. The willow is willing to discuss terms, which is how it prefers to be paid." };
+    return { label: "STILL STANDING", text: "The corruption is low. Do not celebrate yet. The willow is only waiting for the interest to accrue, and it has all the time there is." };
   }
 
   /* ---------------- public ---------------- */
