@@ -1,4 +1,6 @@
 # One Wish Willow
+![One Wish Willow screenshot](screenshots/website.jpg)
+
 
 A cinematic, single-page wish-granting experience inspired by **Obsession**.
 
